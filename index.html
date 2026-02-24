@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RUNWAY</title>
+<link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+/* ── DESIGN TOKENS ── */
+:root {
+  --frame: #d40019;          /* UI frame — always red          */
+  --idle:  #d40019;          /* IDLE state — red               */
+  --work:  #1e90ff;          /* WORK state — blue              */
+  --brk:   #a87fff;          /* BREAK state — purple           */
+  --black: #070707;
+  --b2:    #0d0d0d;
+  --b3:    #151515;
+  --b5:    #252525;
+  --white: #ede8de;
+  --gray:  #7a7670;
+  --btn-h: 96px;
+}
+
+/* ── RESET ── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  background: var(--black);
+  color: var(--white);
+  font-family: 'Black Ops One', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* diagonal stripe background */
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background: repeating-linear-gradient(
+    108deg,
+    transparent 0, transparent 72px,
+    rgba(180,0,20,.018) 72px, rgba(180,0,20,.018) 74px
+  );
+}
+
+/* ── LAYOUT ── */
+.app {
+  position: relative; z-index: 1;
+  max-width: 440px; margin: 0 auto;
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  padding-bottom: 60px;
+}
+
+/* ── HEADER ── */
+.hdr {
+  background: var(--frame);
+  height: 82px;
+  display: flex; align-items: flex-end;
+  padding: 0 22px 14px;
+  position: relative; overflow: hidden;
+  clip-path: polygon(0 0, 100% 0, 100% 60%, 88% 100%, 0 100%);
+}
+.hdr::before {
+  content: ''; position: absolute;
+  top: 0; right: -10px; bottom: 0; width: 90px;
+  background: rgba(0,0,0,.28); transform: skewX(-8deg);
+  pointer-events: none;
+}
+.hdr::after {
+  content: ''; position: absolute;
+  bottom: 0; left: 0; right: 0; height: 2px;
+  background: rgba(0,0,0,.45);
+}
+.hdr-title {
+  font-size: 2.8rem; letter-spacing: .22em; color: var(--white);
+  position: relative; z-index: 1; line-height: 1;
+  text-shadow: 4px 4px 0 rgba(0,0,0,.5), -1px -1px 0 rgba(255,255,255,.06);
+}
+
+/* ── STATUS BAR ── */
+.status {
+  margin: 10px 14px 0;
+  background: var(--b2);
+  border-left: 4px solid var(--frame);
+  padding: 9px 15px;
+  display: flex; align-items: center;
+  transition: border-color .35s;
+}
+.s-dot {
+  width: 8px; height: 8px;
+  transform: rotate(45deg); flex-shrink: 0;
+  background: var(--gray); margin-right: 10px;
+  transition: background .35s;
+  animation: dpulse 1.7s ease-in-out infinite;
+}
+@keyframes dpulse { 0%,100% { opacity: 1 } 50% { opacity: .18 } }
+.s-name { font-size: 1.15rem; letter-spacing: .14em; color: var(--white); }
+
+/* ── TIMER BLOCK ── */
+.tblock {
+  margin: 10px 14px 0;
+  background: var(--b2);
+  padding: 22px 18px 20px;
+  display: flex; flex-direction: column; align-items: center;
+  position: relative; overflow: hidden;
+}
+/* red corner brackets */
+.tblock::before, .tblock::after, .tblock .cb, .tblock .cd {
+  content: ''; position: absolute;
+  width: 13px; height: 13px;
+  border-color: var(--frame); border-style: solid;
+}
+.tblock::before { top: 0; left: 0;     border-width: 2px 0 0 2px; }
+.tblock::after  { top: 0; right: 0;    border-width: 2px 2px 0 0; }
+.tblock .cb     { bottom: 0; left: 0;  border-width: 0 0 2px 2px; }
+.tblock .cd     { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
+/* scanline texture */
+.tblock .scan {
+  position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 3px,
+    rgba(0,0,0,.07) 3px, rgba(0,0,0,.07) 4px
+  );
+}
+.t-mode {
+  font-size: .68rem; letter-spacing: .28em;
+  color: var(--frame); margin-bottom: 12px;
+  position: relative; z-index: 1; transition: color .35s;
+}
+
+/* SVG ring — r=90, circumference=565.48 */
+.ring-wrap { position: relative; width: 208px; height: 208px; z-index: 1; }
+.ring-svg  { width: 208px; height: 208px; transform: rotate(-90deg); }
+.ring-bg   { fill: none; stroke: #181818; stroke-width: 11; }
+.ring-arc  {
+  fill: none; stroke: var(--idle);
+  stroke-width: 11; stroke-linecap: butt;
+  stroke-dasharray: 565.48; stroke-dashoffset: 565.48;
+  transition: stroke-dashoffset .48s linear, stroke .35s ease;
+}
+.ring-inner {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.t-num {
+  font-size: 4.1rem; letter-spacing: .05em; line-height: 1;
+  color: var(--white); transition: color .3s;
+}
+
+/* ── BUTTONS ── */
+.btns      { margin: 10px 14px 0; display: flex; flex-direction: column; gap: 7px; }
+.btns.row2 { flex-direction: row; }
+
+/* base — filled + angled corners, uniform height */
+.pb {
+  position: relative; border: none; cursor: pointer;
+  font-family: 'Black Ops One', sans-serif;
+  font-size: 1.4rem; letter-spacing: .18em;
+  height: var(--btn-h); min-height: var(--btn-h);
+  padding: 0 28px;
+  display: flex; align-items: center; justify-content: center;
+  flex: 1; overflow: hidden;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  transition: transform .08s, filter .1s;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+/* sheen sweep on hover */
+.pb::before {
+  content: ''; position: absolute;
+  top: 0; left: -120%; width: 55%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.22), transparent);
+  transform: skewX(-18deg);
+  transition: left .36s ease; pointer-events: none;
+}
+.pb:hover::before { left: 180%; }
+.pb:hover  { filter: brightness(1.18); }
+.pb:active { transform: scale(.96) translateX(2px); filter: brightness(1.28); transition: transform .05s; }
+
+/* filled variants */
+.pb.idle { background: var(--idle); color: var(--white); }
+.pb.work { background: var(--work); color: var(--white); }
+.pb.brk  { background: var(--brk);  color: var(--white); }
+
+/* skip variants — dashed outline, no fill, no clip */
+.pb.skip-brk, .pb.skip {
+  background: transparent;
+  clip-path: none;
+  font-size: 1.1rem; letter-spacing: .14em;
+  opacity: .65;
+}
+.pb.skip-brk::before, .pb.skip::before { display: none; }
+
+.pb.skip-brk {
+  color: var(--brk);
+  border: 1px dashed var(--brk);
+}
+.pb.skip-brk:hover { opacity: 1; background: rgba(168,127,255,.09); }
+
+.pb.skip {
+  color: var(--idle);
+  border: 1px dashed var(--idle);
+}
+.pb.skip:hover { opacity: 1; background: rgba(212,0,25,.09); }
+
+/* ── STATS ── */
+.sec-label {
+  font-size: .66rem; letter-spacing: .24em; color: var(--frame);
+  margin: 16px 14px 6px;
+  display: flex; align-items: center; gap: 8px;
+}
+.sec-label::after {
+  content: ''; flex: 1; height: 1px;
+  background: linear-gradient(90deg, rgba(212,0,25,.55), transparent);
+}
+.stats-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;
+  margin: 0 14px;
+}
+.sc {
+  background: var(--b2); padding: 12px 12px 10px;
+  border: 1px solid transparent; position: relative;
+  transition: background .2s, border-color .2s; cursor: default;
+}
+.sc::after {
+  content: ''; position: absolute;
+  bottom: 0; left: 0; width: 100%; height: 2px;
+  background: var(--frame);
+  transform: scaleX(0); transform-origin: left;
+  transition: transform .25s ease;
+}
+.sc:hover { background: var(--b3); border-color: var(--b5); }
+.sc:hover::after { transform: scaleX(1); }
+.sc-val {
+  font-size: 2rem; color: var(--white); line-height: 1;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .02em;
+}
+.sc-val sup { font-size: .8rem; color: var(--gray); }
+.sc-key {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: .58rem; letter-spacing: .1em;
+  color: var(--gray); margin-top: 3px; text-align: right;
+}
+
+/* ── PROGRESS ── */
+.prog {
+  margin: 8px 14px 0; background: var(--b2); padding: 11px 13px;
+  border: 1px solid transparent; transition: border-color .2s;
+}
+.prog:hover { border-color: var(--b5); }
+.prog-head {
+  display: flex; justify-content: space-between;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: .6rem; letter-spacing: .1em; color: var(--gray); margin-bottom: 8px;
+}
+.prog-track { height: 3px; background: #181818; }
+.prog-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--idle), var(--work), var(--brk));
+  transition: width .6s ease;
+}
+
+/* ── LOG ── */
+.log-list { margin: 0 14px; display: flex; flex-direction: column; gap: 4px; }
+.li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; background: var(--b2);
+  border: 1px solid transparent; border-left-width: 2px;
+  transition: background .18s, border-color .18s;
+  animation: slideIn .2s ease;
+}
+@keyframes slideIn { from { opacity: 0; transform: translateX(-7px) } to { opacity: 1; transform: none } }
+.li:hover { background: var(--b3); }
+.li.w { border-left-color: var(--work); } .li:hover.w { border-color: var(--work); }
+.li.b { border-left-color: var(--brk);  } .li:hover.b { border-color: var(--brk);  }
+.li.i { border-left-color: var(--idle); } .li:hover.i { border-color: var(--idle); }
+.li-d { width: 5px; height: 5px; transform: rotate(45deg); flex-shrink: 0; }
+.li.w .li-d { background: var(--work); }
+.li.b .li-d { background: var(--brk);  }
+.li.i .li-d { background: var(--idle); }
+.li-n { flex: 1; font-size: .8rem; letter-spacing: .1em; color: var(--white); }
+.li-t-wrap  { display: flex; flex: 1; justify-content: space-between; align-items: center; min-width: 0; }
+.li-t-time,
+.li-t-dur   { font-family: 'Share Tech Mono', monospace; font-size: .6rem; color: var(--gray); white-space: nowrap; flex-shrink: 0; }
+.log-empty  {
+  text-align: center; font-family: 'Share Tech Mono', monospace;
+  font-size: .68rem; letter-spacing: .18em; color: var(--b5); padding: 14px;
+}
+
+/* ── SOUND TOGGLE ── */
+.sound-row { display: flex; justify-content: flex-end; margin: 8px 14px 0; }
+.sound-btn {
+  background: none; border: 1px solid var(--b5); color: var(--gray);
+  font-family: 'Share Tech Mono', monospace; font-size: .62rem; letter-spacing: .12em;
+  padding: 5px 12px; cursor: pointer; transition: border-color .2s, color .2s;
+}
+.sound-btn:hover { border-color: var(--frame); color: var(--white); }
+
+/* ── FLASH OVERLAY ── */
+.flash {
+  position: fixed; inset: 0; z-index: 999;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none; opacity: 0;
+}
+.flash.on { opacity: 1; }
+.fbox {
+  font-size: 3rem; letter-spacing: .22em; padding: 14px 48px;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  animation: fpop .72s ease forwards;
+}
+.fbox.i { background: var(--idle); color: var(--white); box-shadow: 0 0 80px rgba(212,0,25,.6); }
+.fbox.w { background: var(--work); color: var(--white); box-shadow: 0 0 80px rgba(30,144,255,.6); }
+.fbox.b { background: var(--brk);  color: var(--white); box-shadow: 0 0 80px rgba(168,127,255,.6); }
+@keyframes fpop {
+  0%   { transform: scale(.55) rotate(-2deg); opacity: 0; }
+  22%  { transform: scale(1.07) rotate(.5deg); opacity: 1; }
+  65%  { transform: scale(1) rotate(0); opacity: 1; }
+  100% { transform: scale(1.04) rotate(-.4deg); opacity: 0; }
+}
+
+/* ── PAGE LOAD STAGGER ── */
+.app > * { animation: fadeUp .32s ease both; }
+.app > *:nth-child(1)  { animation-delay: .03s }
+.app > *:nth-child(2)  { animation-delay: .09s }
+.app > *:nth-child(3)  { animation-delay: .14s }
+.app > *:nth-child(4)  { animation-delay: .18s }
+.app > *:nth-child(5)  { animation-delay: .22s }
+.app > *:nth-child(6)  { animation-delay: .26s }
+.app > *:nth-child(7)  { animation-delay: .30s }
+.app > *:nth-child(8)  { animation-delay: .34s }
+.app > *:nth-child(9)  { animation-delay: .38s }
+.app > *:nth-child(10) { animation-delay: .42s }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(-7px) } to { opacity: 1; transform: none } }
+</style>
+</head>
+<body>
+
+<div class="flash" id="flashEl">
+  <div class="fbox i" id="fbox">OK</div>
+</div>
+
+<div class="app">
+
+  <div class="hdr">
+    <div class="hdr-title">RUNWAY</div>
+  </div>
+
+  <div class="status" id="status">
+    <div class="s-dot" id="sDot"></div>
+    <div class="s-name" id="sName">STANDING BY</div>
+  </div>
+
+  <div class="tblock">
+    <div class="cb"></div><div class="cd"></div>
+    <div class="scan"></div>
+    <div class="t-mode" id="tMode">IDLE MODE</div>
+    <div class="ring-wrap">
+      <svg class="ring-svg" viewBox="0 0 200 200">
+        <circle class="ring-bg"  cx="100" cy="100" r="90"/>
+        <circle class="ring-arc" id="arc" cx="100" cy="100" r="90"/>
+      </svg>
+      <div class="ring-inner">
+        <div class="t-num" id="tNum">01:00</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sound-row">
+    <button class="sound-btn" id="soundBtn" onclick="toggleSound()">SFX ON</button>
+  </div>
+
+  <div id="btns" class="btns">
+    <button class="pb idle" onclick="startIdling()">START</button>
+  </div>
+
+  <div class="sec-label">STATUS</div>
+  <div class="stats-grid">
+    <div class="sc">
+      <div class="sc-val" id="stS">0</div>
+      <div class="sc-key">SESSIONS</div>
+    </div>
+    <div class="sc">
+      <div class="sc-val" id="stT">0<sup>h</sup> 0<sup>m</sup> 0<sup>s</sup></div>
+      <div class="sc-key">TOTAL TIME</div>
+    </div>
+  </div>
+
+  <div class="prog">
+    <div class="prog-head">
+      <span>TODAY</span><span id="progTxt">0% — 2H GOAL</span>
+    </div>
+    <div class="prog-track">
+      <div class="prog-fill" id="progFill" style="width:0%"></div>
+    </div>
+  </div>
+
+  <div class="sec-label">LOG</div>
+  <div class="log-list" id="logList">
+    <div class="log-empty">— EMPTY —</div>
+  </div>
+
+</div>
+
+<script>
+/* ── CONSTANTS ── */
+const CIRC    = 2 * Math.PI * 90; // ring circumference (r=90)
+const GOAL    = 7200;              // 2h in seconds
+const WORK_LP = 3600;              // ring loop period for WORK (1h)
+
+/* ── STATE ── */
+let phase   = 'idle';
+let iv      = null;
+let elapsed = 0;
+let soundOn = true;
+let st      = { sess: 0, total: 0 };
+let wStart  = null;  // WORK session start (Date.now)
+let iStart  = null;  // IDLE session start (Date.now)
+let bStart  = null;  // BREAK session start (Date.now)
+let logs    = [];
+
+/* ── AUDIO ── */
+let ac = null;
+function getAC() { return ac = ac || new (window.AudioContext || window.webkitAudioContext)(); }
+
+function beep(hz, dur, type = 'square', vol = 0.15) {
+  if (!soundOn) return;
+  try {
+    const ctx = getAC(), o = ctx.createOscillator(), g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type = type; o.frequency.value = hz;
+    g.gain.setValueAtTime(vol, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    o.start(); o.stop(ctx.currentTime + dur);
+  } catch(e) {}
+}
+
+const sfx = {
+  start:   () => { beep(440, .07); setTimeout(() => beep(660, .10), 70); },
+  success: () => { [523, 659, 784, 1047].forEach((h, i) => setTimeout(() => beep(h, .12), i * 65)); },
+  notify:  () => { beep(660, .09); setTimeout(() => beep(770, .11), 130); },
+  brk:     () => { beep(440, .13, 'sine', .13); setTimeout(() => beep(330, .19, 'sine', .10), 145); },
+};
+
+/* ── TIMER ── */
+function stopT() { if (iv) { clearInterval(iv); iv = null; } }
+
+function startT(total, onTick, onDone) {
+  stopT(); elapsed = 0;
+  ringSet(0, total);
+  iv = setInterval(() => {
+    elapsed++;
+    ringSet(elapsed, total);
+    onTick(elapsed);
+    if (elapsed >= total) { stopT(); onDone(); }
+  }, 1000);
+}
+
+/* ── RING ── */
+function ringSet(e, t) {
+  document.getElementById('arc').style.strokeDashoffset = CIRC * (1 - Math.min(e / t, 1));
+}
+function ringColor(c) { document.getElementById('arc').style.stroke = c; }
+
+/* ── FORMAT ── */
+function fmt(s) {
+  return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+}
+function fmtDur(sec) {
+  if (sec < 60) return sec + 's';
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return s > 0 ? m + 'm' + s + 's' : m + 'm';
+}
+
+/* ── UI ── */
+const $ = id => document.getElementById(id);
+
+function setStatus(name, dotColor) {
+  $('sName').textContent = name;
+  $('sDot').style.background = dotColor;
+  $('status').style.borderLeftColor = dotColor;
+}
+function setMode(text, color) {
+  const m = $('tMode'); m.textContent = text; m.style.color = color;
+}
+function setNum(text) { $('tNum').textContent = text; }
+function setBtns(html, row2) {
+  const el = $('btns');
+  el.className = row2 ? 'btns row2' : 'btns';
+  el.innerHTML = html;
+}
+function flash(txt, cls) {
+  const b = $('fbox'), el = $('flashEl');
+  b.textContent = txt; b.className = 'fbox ' + cls;
+  el.classList.add('on');
+  b.style.animation = 'none'; void b.offsetWidth;
+  b.style.animation = 'fpop .72s ease forwards';
+  setTimeout(() => el.classList.remove('on'), 800);
+}
+function addLog(type, name, sec) {
+  const now = new Date();
+  const t = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  logs.unshift({ type, name, dur: fmtDur(sec), t });
+  if (logs.length > 10) logs.pop();
+  renderLog();
+}
+function renderLog() {
+  const el = $('logList');
+  if (!logs.length) { el.innerHTML = '<div class="log-empty">— EMPTY —</div>'; return; }
+  el.innerHTML = logs.map(l => `
+    <div class="li ${l.type}">
+      <div class="li-d"></div>
+      <div class="li-n">${l.name}</div>
+      <div class="li-t-wrap">
+        <span class="li-t-time">${l.t}</span>
+        <span class="li-t-dur">${l.dur}</span>
+      </div>
+    </div>`).join('');
+}
+function updateStats() {
+  $('stS').textContent = st.sess;
+  const h = Math.floor(st.total / 3600),
+        m = Math.floor((st.total % 3600) / 60),
+        s = st.total % 60;
+  $('stT').innerHTML = h + '<sup>h</sup> ' + m + '<sup>m</sup> ' + s + '<sup>s</sup>';
+  const pct = Math.min(Math.round(st.total / GOAL * 100), 100);
+  $('progFill').style.width = pct + '%';
+  $('progTxt').textContent = pct + '% — 2H GOAL';
+}
+
+/* ── FLOWS ── */
+
+// STANDING BY → IDLING
+function startIdling() {
+  phase = 'idling'; sfx.start();
+  iStart = Date.now();
+  setStatus('IDLING', 'var(--idle)');
+  ringColor('var(--idle)');
+  setMode('IDLE MODE', 'var(--idle)');
+  setBtns(`<button class="pb skip-brk" onclick="goBreak()">SKIP TO BREAK</button>`);
+  startT(60,
+    e => setNum(fmt(60 - e)),
+    () => {
+      sfx.notify(); flash('CLEAR!', 'i');
+      addLog('i', 'IDLE', 60);
+      iStart = null;
+      showChoosing();
+    }
+  );
+}
+
+// IDLING complete → CHOOSING
+function showChoosing() {
+  phase = 'choosing';
+  setStatus('CHOOSING', 'var(--idle)');
+  setMode('IDLE MODE', 'var(--idle)');
+  setNum('OK');
+  setBtns(`
+    <button class="pb brk"  onclick="goBreak()">TAKE A BREAK</button>
+    <button class="pb work" onclick="startWorking()">KEEP GOING</button>
+  `, true);
+}
+
+// CHOOSING → WORKING
+function startWorking() {
+  phase = 'working'; sfx.success(); flash('GO!', 'w');
+  wStart = Date.now();
+  setStatus('WORKING', 'var(--work)');
+  ringColor('var(--work)');
+  setMode('WORK MODE', 'var(--work)');
+  setBtns(`<button class="pb brk" onclick="goBreak()">TAKE A BREAK</button>`);
+  let ws = 0; stopT();
+  iv = setInterval(() => {
+    ws++; st.total++;
+    ringSet(ws % WORK_LP, WORK_LP);
+    setNum(fmt(ws));
+    updateStats();
+  }, 1000);
+}
+
+// → BREAKING (from any phase, immediate countdown)
+function goBreak() {
+  if (phase === 'idling' && iStart) {
+    addLog('i', 'IDLE', Math.round((Date.now() - iStart) / 1000));
+    iStart = null;
+  }
+  if (phase === 'working' && wStart) {
+    st.sess++;
+    addLog('w', 'WORK', Math.round((Date.now() - wStart) / 1000));
+    wStart = null;
+  }
+  stopT();
+  phase = 'breaking'; sfx.brk(); updateStats();
+  bStart = Date.now();
+  setStatus('BREAKING', 'var(--brk)');
+  ringColor('var(--brk)'); ringSet(0, 60);
+  setMode('BREAK MODE', 'var(--brk)');
+  setBtns(`<button class="pb skip" onclick="readyAgain()">SKIP</button>`);
+  startT(60,
+    e => setNum(fmt(60 - e)),
+    () => {
+      sfx.notify(); addLog('b', 'BREAK', 60); flash('RESET', 'b');
+      bStart = null;
+      readyAgain();
+    }
+  );
+}
+
+// → STANDING BY
+function readyAgain() {
+  stopT();
+  if (phase === 'breaking' && bStart) {
+    const actual = Math.round((Date.now() - bStart) / 1000);
+    if (actual < 60) addLog('b', 'BREAK', actual); // skip already logs 60s via timer
+    bStart = null;
+  }
+  phase = 'idle';
+  setStatus('STANDING BY', 'var(--gray)');
+  $('status').style.borderLeftColor = 'var(--frame)';
+  ringColor('var(--idle)'); ringSet(0, 60);
+  setMode('IDLE MODE', 'var(--idle)');
+  setNum('01:00');
+  setBtns(`<button class="pb idle" onclick="startIdling()">START</button>`);
+}
+
+function toggleSound() {
+  soundOn = !soundOn;
+  $('soundBtn').textContent = soundOn ? 'SFX ON' : 'SFX OFF';
+  if (soundOn) beep(440, .05);
+}
+
+/* ── INIT ── */
+ringSet(0, 60);
+updateStats();
+</script>
+</body>
+</html>
